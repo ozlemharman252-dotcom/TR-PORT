@@ -17,23 +17,39 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK
+      - name: Locate Android SDK
         run: |
-          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-          echo "/usr/local/lib/android/sdk/platform-tools" >> $GITHUB_PATH
-          echo "/usr/local/lib/android/sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "/usr/local/lib/android/sdk/build-tools/35.0.0" >> $GITHUB_PATH
-          sdkmanager --sdk_root=/usr/local/lib/android/sdk "platforms;android-35" "build-tools;35.0.0"
+          SDK=/usr/local/lib/android/sdk
+          if [ ! -d "$SDK" ]; then
+            SDK=/usr/local/lib/android/sdk
+          fi
+          echo "ANDROID_HOME=$SDK" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$SDK" >> $GITHUB_ENV
+
+          TOOL=$(find "$SDK" -name sdkmanager -type f 2>/dev/null | head -n 1)
+          if [ -z "$TOOL" ]; then
+            echo "sdkmanager bulunamadı"
+            find /usr/local -name sdkmanager 2>/dev/null
+            exit 1
+          fi
+
+          echo "$(dirname "$TOOL")" >> $GITHUB_PATH
+          echo "SDK tool: $TOOL"
+
+          "$TOOL" --sdk_root="$SDK" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build
+      - name: Build APK
         run: |
           if [ -f gradlew ]; then
             chmod +x gradlew
             ./gradlew assembleDebug
           else
-            gradle assembleDebug
+            echo "Gradle wrapper bulunamadı"
+            exit 1
           fi
 
       - uses: actions/upload-artifact@v4
